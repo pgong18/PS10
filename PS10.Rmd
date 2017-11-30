@@ -26,6 +26,7 @@ Please indicate who you collaborated with on this assignment:
 library(tidyverse)
 library(broom)
 library(glmnet)
+library(MLmetrics)
 
 train <- read_csv("data/train.csv")
 test <- read_csv("data/test.csv")
@@ -77,21 +78,9 @@ LASSO_CV <- cv.glmnet(x=predictor_matrix_train, y=train$log_price_doc, alpha = 1
 # Optimal lambdas
 lambda_star <- LASSO_CV$lambda.min
 lambda_star_1SE <- LASSO_CV$lambda.1se
-plot(LASSO_CV)
-abline(v=log(lambda_star), col="red")
-abline(v=log(lambda_star_1SE), col="blue")
 ```
 
-##with optimal lamda
 
-```{r}
-plot_LASSO_coefficients <- plot_LASSO_coefficients +
-  geom_vline(xintercept = lambda_star, col="red", alpha=0.4, linetype="dashed") +
-  geom_vline(xintercept = lambda_star_1SE, col="blue", alpha=0.4, linetype="dashed")
-plot_LASSO_coefficients
-plot_LASSO_coefficients +
-  coord_cartesian(xlim=c(0.01, 0.6), ylim=c(-0.4, 0.2))
-```
 
 
 ##prediction
@@ -107,26 +96,25 @@ write.csv(pred1, file = "submission1.csv", row.names = F)
 ##training score calculation
 ```{r}
 y_hat_train <- predict(LASSO_fit, newx=predictor_matrix_train, s=lambda_star_1SE) %>% as.vector()
-train1<-mutate(train,y_hat_train = y_hat_train)
-train2<-mutate(train1,MSLE =(log_price_doc - y_hat_train)^2)
-mean(train2$MSLE)
+y_hat_train1<-exp(y_hat_train)
+RMSLE(y_hat_train1,train$price_doc)
 ```
 
 
+#linear 
+
 ```{r}
-lm_fit <- lm(model_formula,data=train)
-y_hat_lm<-predict(lm_fit,data=test)%>% as.vector()
-y_hat_exp_lm<-exp(y_hat_lm)
-pred2 <- cbind(id = test$id, y_hat_exp_lm)
-colnames(pred2) <- c("id","price_doc")
-write.csv(pred2, file = "submission2.csv", row.names = F)
+lm_fit<-lm(model_formula, data=train) 
+y_hat_lm <- predict(lm_fit, newdata=test)
+y_hat_lm <- exp(y_hat_lm)
+submission <- data.frame(id = test$id, price_doc = y_hat_lm)
+write_csv(submission, "submission2.csv")
 ```
 
 ```{r}
 y_lm <- predict(lm_fit, data=train)
-trainlm1<-mutate(train,y_hat_train = y_lm)
-trainlm2<-mutate(trainlm1,MSLE =(log_price_doc - y_hat_train)^2)
-mean(trainlm2$MSLE)
+y_lm1<-exp(y_lm)
+RMSLE(y_lm1, train$price_doc)
 ```
 
 
@@ -139,5 +127,5 @@ in these cells:
 
 Method                | Training Score  | Kaggle Score
 --------------------- | -------------   | -------------
-lm                    |     0.0642      |  0.79051
-LASSO crossvalidated  |     0.2675      |  0.45162
+lm                    |     0.2535      |  2.63413
+LASSO crossvalidated  |     0.5416      |  0.45162
